@@ -1,54 +1,22 @@
-from app.schemas.nb_schema import NBSchema
-from app.db.sqlserver import get_sqlserver_db
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List
 from datetime import date
+from app.schemas.nb_schema import NBSchema
+from app.db.sqlserver import get_au_fit_session, get_au_uts_session
+from app.db.sql_server_queries.nb_query import nb_fit_query, nb_uts_query
+from app.utils.previous_year_day import calculate_dates
 
 router = APIRouter()
 
-@router.get("/nb", response_model=List[NBSchema])
-def get_nb(
-    db: Session = Depends(get_sqlserver_db),
-    created_date: date = Query(..., description="Date for filtering results")
-):
+def execute_query(db: Session, query: str, start_date: date, end_date: date) -> List[NBSchema]:
     try:
         # Define the raw SQL query with a placeholder for the date
-        query = """
-        SELECT 
-            CONVERT(DATE, PT.CreatedDate) AS CreatedDate,
-            'AU' AS Country,
-            CASE 
-                WHEN Q.QuoteSaveFrom = 1 THEN 'Phone'
-                WHEN Q.QuoteSaveFrom = 2 THEN 'Web'
-                ELSE 'Other'
-            END AS PolicyReceivedMethodId,
-            COUNT(P.PolicyNumber) AS Sales
-        FROM [fit-petcover].[dbo].PolicyTransaction PT
-        INNER JOIN [fit-petcover].[dbo].Policy P ON P.Id = PT.PolicyId
-        INNER JOIN [fit-petcover].[dbo].Quote Q ON Q.Id = PT.QuoteId
-        WHERE 
-            CONVERT(DATE, PT.CreatedDate) = :created_date
-            AND PT.TransactionTypeId = 1
-            AND ISNULL(P.IsFreeProduct, 0) = 0
-            AND P.PolicyStatusId = (SELECT Id FROM [fit-petcover].[dbo].PolicyStatus WHERE Name = 'Active')
-            AND ISNULL(P.PetName, '') NOT LIKE '%test%'
-            AND P.PolicyNumber NOT LIKE '%TEST%'
-        GROUP BY 
-            CONVERT(DATE, PT.CreatedDate),
-            CASE 
-                WHEN Q.QuoteSaveFrom = 1 THEN 'Phone'
-                WHEN Q.QuoteSaveFrom = 2 THEN 'Web'
-                ELSE 'Other'
-            END
-        """
-        query = """
-        
-        """
+        sql_query = text(query)
         
         # Execute the raw SQL query with the provided date
-        result = db.execute(text(query), {"created_date": created_date})
+        result = db.execute(sql_query, {"start_date": start_date,"end_date": end_date})
         
         # Convert the result into a list of dictionaries
         rows = result.mappings().all()
@@ -58,3 +26,39 @@ def get_nb(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/nb_au_fit", response_model=List[NBSchema])
+async def get_nb_au_fit(
+    db: Session = Depends(get_au_fit_session),
+    start_date: date = Query(..., description="Start date for filtering result"),
+    end_date: date = Query(..., description="End date for filtering result. End date is not included in the result set")
+):
+    return execute_query(db, nb_fit_query, start_date, end_date)
+
+@router.get("/nb_au_uts", response_model=List[NBSchema])
+async def get_nb_au_uts(
+    db: Session = Depends(get_au_uts_session),
+    start_date: date = Query(..., description="Start date for filtering result"),
+    end_date: date = Query(..., description="End date for filtering result. End date is not included in the result set")
+):
+    return execute_query(db, nb_uts_query, start_date, end_date)
+
+@router.get("/nb_au_fit_last_year", response_model=List[NBSchema])
+async def get_nb_au_fit(
+    db: Session = Depends(get_au_fit_session),
+    start_date: date = Query(..., description="Start date for filtering result"),
+    end_date: date = Query(..., description="End date for filtering result. End date is not included in the result set")
+):
+    last_year_start_date = calculate_dates(start_date)
+    last_year_end_date = calculate_dates(end_date)
+    return execute_query(db, nb_fit_query, last_year_start_date, last_year_end_date)
+
+@router.get("/nb_au_uts_last_year", response_model=List[NBSchema])
+async def get_nb_au_uts(
+    db: Session = Depends(get_au_uts_session),
+    start_date: date = Query(..., description="Start date for filtering result"),
+    end_date: date = Query(..., description="End date for filtering result. End date is not included in the result set")
+):
+    last_year_start_date = calculate_dates(start_date)
+    last_year_end_date = calculate_dates(end_date)
+    return execute_query(db, nb_uts_query, last_year_start_date, last_year_end_date)

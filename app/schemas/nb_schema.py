@@ -3,8 +3,8 @@ from typing import Literal, Optional
 from datetime import date
 
 class NBSchema(BaseModel):
-    CreatedDate: Optional[date]
-    Country: Optional[Literal['AU']]
+    CreatedDate: Optional[date]=None
+    Country: Optional[Literal['AU-FIT','AU-UTS']]
     PolicyReceivedMethodId: Optional[Literal['Phone', 'Web', 'Other']]
     Sales: Optional[int]
 
