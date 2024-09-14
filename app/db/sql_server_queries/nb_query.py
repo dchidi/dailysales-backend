@@ -1,13 +1,13 @@
 nb_fit_query = """
         SELECT 
-    CONVERT(DATE, PT.CreatedDate) AS CreatedDate,
-    'AU-FIT' AS Country,
+    CONVERT(DATE, PT.CreatedDate) AS created_at,
+    'AU' AS country,
     CASE 
         WHEN Q.QuoteSaveFrom = 1 THEN 'Phone'
         WHEN Q.QuoteSaveFrom = 2 THEN 'Web'
         ELSE 'Other'
-    END AS PolicyReceivedMethodId,
-    COUNT(P.PolicyNumber) AS Sales
+    END AS receivedMethod,
+    COUNT(P.PolicyNumber) AS sales_count, '' AS product, 'FIT' as [system]
 FROM [fit-petcover].[dbo].PolicyTransaction PT
 INNER JOIN [fit-petcover].[dbo].Policy P ON P.Id = PT.PolicyId
 INNER JOIN [fit-petcover].[dbo].Quote Q ON Q.Id = PT.QuoteId
@@ -29,10 +29,10 @@ GROUP BY
         """
 nb_uts_query = """
     SELECT
-        CreatedDate,
-        PolicyReceivedMethodId,
-        Country,
-        COUNT(PolicyNumber) AS Sales
+        created_at,
+        receivedMethod,
+        country,
+        COUNT(PolicyNumber) AS sales_count,'' AS product, 'UTS' as [system]
     FROM (
         SELECT
             PO.ProductCode,
@@ -42,7 +42,7 @@ nb_uts_query = """
             PA.TotalPremiumAmount,
             0 AS [IsPetIdProduct],
             PA.StartDate,
-            CONVERT(DATE, PA.CreatedDate) AS CreatedDate,
+            CONVERT(DATE, PA.CreatedDate) AS created_at,
             P.PolicyNumber,
             P.PetName,
             CL.FirstName AS ClientName,
@@ -50,10 +50,10 @@ nb_uts_query = """
             CASE
                 WHEN U.FirstName IN ('FIT', 'Web') THEN 'Web'
                 ELSE 'Phone'
-            END AS PolicyReceivedMethodId,
+            END AS receivedMethod,
             'UTS1' AS [System],
             PS.PolicyStatusName,
-            'AU-UTS' AS Country
+            'AU-UTS' AS country
         FROM [PolicyActivity] PA
         LEFT JOIN Policy P ON P.Id = PA.PolicyId
         LEFT JOIN [Master].[PolicyStatus] PS ON PS.Id = P.PolicyStatusId
@@ -73,6 +73,6 @@ nb_uts_query = """
             AND PO.ProductCode NOT LIKE '%CM%'
     ) AS FilteredData
     GROUP BY
-        PolicyReceivedMethodId,
-        Country, CreatedDate
+        receivedMethod,
+        country, created_at
 """

@@ -1,12 +1,18 @@
-from pydantic import BaseModel
-from typing import Literal, Optional
-from datetime import date
+from pydantic import BaseModel, validator
+from datetime import datetime, date
+from typing import Optional
 
 class NBSchema(BaseModel):
-    CreatedDate: Optional[date]=None
-    Country: Optional[Literal['AU-FIT','AU-UTS']]
-    PolicyReceivedMethodId: Optional[Literal['Phone', 'Web', 'Other']]
-    Sales: Optional[int]
+    created_at: str  # Change to str to handle serialization
+    country: str
+    receivedMethod: str
+    sales_count: float
+    product: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    @validator('created_at', pre=True, always=True)
+    def parse_date(cls, v):
+        if isinstance(v, datetime):
+            return v.isoformat()  # Convert datetime to ISO 8601 format
+        if isinstance(v, date):
+            return datetime.combine(v, datetime.min.time()).isoformat()  # Convert date to datetime and then to ISO 8601
+        return v

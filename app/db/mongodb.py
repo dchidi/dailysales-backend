@@ -1,8 +1,9 @@
 from motor.motor_asyncio import AsyncIOMotorClient
+from app.core.config import Settings
 
-MONGO_URL = "mongodb://localhost:27017"
-mongo_client = AsyncIOMotorClient(MONGO_URL)
-mongo_db = mongo_client.trade_report_db
+settings = Settings()
+mongo_client = AsyncIOMotorClient(settings.mongo_url)
+mongo_db = mongo_client.daily_sales_db
 
 
 async def get_mongo_db():
