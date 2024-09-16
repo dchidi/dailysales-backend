@@ -28,7 +28,7 @@ class MongoSalesService:
             raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
 
     @classmethod
-    async def cummulative_sales(cls, curr_year_data: List[dict], prev_year_data:List[dict],  date_obj:datetime) -> str:
+    async def cummulative_sales(cls, curr_year_data: List[dict], prev_year_data:List[dict],  date_obj:datetime):
         # get total days in the month
         year = date_obj.year
         month = date_obj.month
@@ -90,10 +90,22 @@ class MongoSalesService:
             if not matched:
                 prev_year_result.append(total_sales)
             
-        
-                
+        # Format the response with the year as the key
+        current_year_key = date_obj.year
+        prev_year_key = current_year_key - 1
+ 
 
-        print(curr_year_result, prev_year_result)
+        # print(curr_year_result, prev_year_result)
 
-        return "testing"
-        
+        return {str(current_year_key):curr_year_result,  str(prev_year_key):prev_year_result, "days_in_month":total_days,
+                "curr_year":current_year_key, "prev_year":prev_year_key}
+
+    @classmethod
+    async def sales_by_channel(cls, data: List[dict]):
+        channel ={
+            "Phone": 0,
+            "Web": 0,
+        }
+        for item in data:
+            channel[item['receivedMethod']] += int(item['sales_count'])
+        return channel
