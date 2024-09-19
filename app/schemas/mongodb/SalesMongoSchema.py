@@ -7,16 +7,18 @@ class SalesSchema(BaseModel):
     created_at: datetime
     country: str
     receivedMethod: str
-    sales_count: float
-    product: str
+    sales_count: int
+    product: Optional[str] = None
+    system:Optional[str] = None
 
 class SalesResponseSchema(BaseModel):
     id: str
     created_at: datetime
     country: str
     receivedMethod: str
-    sales_count: float
+    sales_count: int
     product: Optional[str] = None
+    system: Optional[str] = None
 
     class Config:
         # Ensure the `id` field is read as a string (not ObjectId)

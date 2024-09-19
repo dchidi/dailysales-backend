@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException,HTTPException, File, UploadFile
 from typing import Dict, List
 from datetime import date, timedelta
 from app.schemas.mongodb.SalesMongoSchema import SalesResponseSchema
@@ -6,8 +6,12 @@ from app.db.mongodb import get_mongo_db
 from app.utils.previous_year_day import calculate_dates
 from app.services.mongo_sales_service import MongoSalesService
 import calendar
+import pandas as pd
+import io
 
 router = APIRouter()
+
+# Query Fixed on AU for now
 
 async def fetch_sales_data(collection, start_datetime, end_datetime):
     pipeline = [
@@ -16,7 +20,8 @@ async def fetch_sales_data(collection, start_datetime, end_datetime):
                 "created_at": {
                     "$gte": start_datetime,
                     "$lt": end_datetime
-                }
+                },
+                "country":"AU"
             }
         },
         {
@@ -44,7 +49,8 @@ async def fet_sales_by_channel(collection, from_date, to_date):
             "created_at": {
                 "$gte": from_date,
                 "$lt": to_date
-            }
+            },
+            "country" : "AU"
         }
     cursor = collection.find(query)
     # Convert cursor to list
@@ -203,9 +209,9 @@ async def get_table_data(
         total_sales["target_mtd"]= round(total_sales["prev_year_mtd"] * 1.15, 1)
 
         # MTD Target Difference
-        phone_sales["target_diff"]= phone_sales["target_mtd"] - phone_sales["curr_year_mtd"]
-        web_sales["target_diff"]= web_sales["target_mtd"] - web_sales["curr_year_mtd"]
-        total_sales["target_diff"]= phone_sales["target_diff"] +  web_sales["target_diff"]
+        phone_sales["target_diff"]= round(phone_sales["target_mtd"] - phone_sales["curr_year_mtd"],0)
+        web_sales["target_diff"]= round(web_sales["target_mtd"] - web_sales["curr_year_mtd"],0)
+        total_sales["target_diff"]= round(phone_sales["target_diff"] +  web_sales["target_diff"],0)
 
         # MTD Target Difference Percentage
         phone_sales["target_diff_percent"]= percentage_tgt_diff(phone_sales["target_mtd"], phone_sales["curr_year_mtd"])
@@ -216,3 +222,29 @@ async def get_table_data(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
+
+@router.post("/upload_csv")
+async def upload_csv(file: UploadFile = File(...)):
+    db = await get_mongo_db()
+    collection = db.Sales
+    """Endpoint to upload CSV and insert data into MongoDB."""
+    if file.content_type != 'text/csv':
+        raise HTTPException(status_code=400, detail="Invalid file type. Only CSV files are allowed.")
+
+    try:
+        # Read the uploaded file
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+
+        # Convert DataFrame to dictionary records
+        records = df.to_dict('records')
+
+        # Insert records into MongoDB
+        if records:
+            result = await collection.insert_many(records)
+            return {'message': 'File successfully uploaded and data inserted into MongoDB'}
+        else:
+            raise HTTPException(status_code=400, detail="CSV file is empty")
+    except Exception as e:
+        # Handle exceptions (e.g., parsing errors, database errors)
+        raise HTTPException(status_code=500, detail=str(e))

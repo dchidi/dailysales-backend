@@ -33,7 +33,13 @@ async def get_nb_au_fit(
     end_date: date = Query(..., description="End date for filtering result. End date is not included in the result set")
 ):
     data = execute_query(db, nb_fit_query, start_date, end_date)    
-    result = await MongoSalesService.insert_sales(data)
+    # result = await MongoSalesService.insert_sales(data)
+    # return result
+  
+    if data:
+        result = await MongoSalesService.insert_sales(data)
+    else: 
+        result = {"msg": "No sales record", "count": 0}
     return result
 
 @router.get("/nb_au_uts", response_model=InsertResponseSchema)
@@ -43,7 +49,11 @@ async def get_nb_au_uts(
     end_date: date = Query(..., description="End date for filtering result. End date is not included in the result set")
 ):
     data = execute_query(db, nb_uts_query, start_date, end_date)
-    result = await MongoSalesService.insert_sales(data)
+        
+    if data:
+        result = await MongoSalesService.insert_sales(data)
+    else: 
+        result = {"msg": "No sales record", "count": 0}
     return result
 
 # @router.get("/nb_au_fit_last_year", response_model=List[NBSchema])

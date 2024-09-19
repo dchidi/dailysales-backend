@@ -1,32 +1,109 @@
+# nb_fit_query = """
+#         SELECT * FROM (SELECT 
+#     CONVERT(DATE, PT.CreatedDate) AS created_at,
+#     'AU' AS country,
+#     CASE 
+#         WHEN Q.QuoteSaveFrom = 1 THEN 'Phone'
+#         WHEN Q.QuoteSaveFrom = 2 THEN 'Web'
+#         ELSE 'Other'
+#     END AS receivedMethod,
+#     COUNT(P.PolicyNumber) AS sales_count, '' AS product, 'FIT' as [system]
+# FROM [fit-petcover].[dbo].PolicyTransaction PT
+# INNER JOIN [fit-petcover].[dbo].Policy P ON P.Id = PT.PolicyId
+# INNER JOIN [fit-petcover].[dbo].Quote Q ON Q.Id = PT.QuoteId) T
+# WHERE 
+#     CONVERT(DATE, PT.CreatedDate) >= :start_date
+#     AND CONVERT(DATE, PT.CreatedDate) < :end_date
+#     AND PT.TransactionTypeId = 1
+#     AND ISNULL(P.IsFreeProduct, 0) = 0
+#     AND P.PolicyStatusId = (SELECT Id FROM [fit-petcover].[dbo].PolicyStatus WHERE Name = 'Active')
+#     AND ISNULL(P.PetName, '') NOT LIKE '%test%'
+#     AND P.PolicyNumber NOT LIKE '%TEST%'
+# GROUP BY 
+#     CONVERT(DATE, PT.CreatedDate),
+#     CASE 
+#         WHEN Q.QuoteSaveFrom = 1 THEN 'Phone'
+#         WHEN Q.QuoteSaveFrom = 2 THEN 'Web'
+#         ELSE 'Other'
+#     END
+#         """
 nb_fit_query = """
-        SELECT 
-    CONVERT(DATE, PT.CreatedDate) AS created_at,
-    'AU' AS country,
-    CASE 
-        WHEN Q.QuoteSaveFrom = 1 THEN 'Phone'
-        WHEN Q.QuoteSaveFrom = 2 THEN 'Web'
-        ELSE 'Other'
-    END AS receivedMethod,
-    COUNT(P.PolicyNumber) AS sales_count, '' AS product, 'FIT' as [system]
-FROM [fit-petcover].[dbo].PolicyTransaction PT
-INNER JOIN [fit-petcover].[dbo].Policy P ON P.Id = PT.PolicyId
-INNER JOIN [fit-petcover].[dbo].Quote Q ON Q.Id = PT.QuoteId
+SELECT 
+    T.created_at,
+    T.receivedMethod,
+    SUM(T.sales_count) AS sales_count,
+    'FIT' as [system],
+	'AU' as country
+FROM (
+    SELECT 
+        CONVERT(DATE, PT.CreatedDate) AS created_at,
+        'AU' AS country,
+        CASE 
+            WHEN Q.QuoteSaveFrom = 1 THEN 'Phone'
+            WHEN Q.QuoteSaveFrom = 2 THEN 'Web'
+            ELSE 'Other'
+        END AS receivedMethod,
+        COUNT(P.PolicyNumber) AS sales_count,
+        '' AS product,
+        'Petcover' AS [system]
+    FROM [fit-petcover].[dbo].PolicyTransaction PT
+    INNER JOIN [fit-petcover].[dbo].Policy P ON P.Id = PT.PolicyId
+    INNER JOIN [fit-petcover].[dbo].Quote Q ON Q.Id = PT.QuoteId
+    WHERE  
+        PT.TransactionTypeId = 1
+        AND ISNULL(P.IsFreeProduct, 0) = 0
+        AND P.PolicyStatusId = (
+            SELECT Id 
+            FROM [fit-petcover].[dbo].PolicyStatus 
+            WHERE Name = 'Active'
+        )
+        AND ISNULL(P.PetName, '') NOT LIKE '%test%'
+        AND P.PolicyNumber NOT LIKE '%TEST%'
+    GROUP BY 
+        CONVERT(DATE, PT.CreatedDate),
+        Q.QuoteSaveFrom
+
+    UNION ALL
+
+    SELECT 
+        CONVERT(DATE, PT.CreatedDate) AS created_at,
+        'AU' AS country,
+        CASE 
+            WHEN Q.QuoteSaveFrom = 1 THEN 'Phone'
+            WHEN Q.QuoteSaveFrom = 2 THEN 'Web'
+            ELSE 'Other'
+        END AS receivedMethod,
+        COUNT(P.PolicyNumber) AS sales_count,
+        '' AS product,
+        'FIT' AS [system]
+    FROM [FIT_DATA].[dbo].PolicyTransaction PT
+    INNER JOIN [FIT_DATA].[dbo].Policy P ON P.Id = PT.PolicyId
+    INNER JOIN [FIT_DATA].[dbo].Quote Q ON Q.Id = PT.QuoteId
+    WHERE  
+        PT.TransactionTypeId = 1
+        AND ISNULL(P.IsFreeProduct, 0) = 0
+        AND P.PolicyStatusId = (
+            SELECT Id 
+            FROM [fit-petcover].[dbo].PolicyStatus 
+            WHERE Name = 'Active'
+        )
+        AND ISNULL(P.PetName, '') NOT LIKE '%test%'
+        AND P.PolicyNumber NOT LIKE '%TEST%'
+    GROUP BY 
+        CONVERT(DATE, PT.CreatedDate),
+        Q.QuoteSaveFrom
+) T
 WHERE 
-    CONVERT(DATE, PT.CreatedDate) >= :start_date
-    AND CONVERT(DATE, PT.CreatedDate) < :end_date
-    AND PT.TransactionTypeId = 1
-    AND ISNULL(P.IsFreeProduct, 0) = 0
-    AND P.PolicyStatusId = (SELECT Id FROM [fit-petcover].[dbo].PolicyStatus WHERE Name = 'Active')
-    AND ISNULL(P.PetName, '') NOT LIKE '%test%'
-    AND P.PolicyNumber NOT LIKE '%TEST%'
+    T.created_at >= :start_date
+    AND T.created_at < :end_date
 GROUP BY 
-    CONVERT(DATE, PT.CreatedDate),
-    CASE 
-        WHEN Q.QuoteSaveFrom = 1 THEN 'Phone'
-        WHEN Q.QuoteSaveFrom = 2 THEN 'Web'
-        ELSE 'Other'
-    END
-        """
+    T.created_at,
+    T.receivedMethod,
+    T.system
+ORDER BY 
+    T.created_at ASC,
+    T.receivedMethod ASC;
+"""
 nb_uts_query = """
     SELECT
         created_at,
@@ -53,7 +130,7 @@ nb_uts_query = """
             END AS receivedMethod,
             'UTS1' AS [System],
             PS.PolicyStatusName,
-            'AU-UTS' AS country
+            'AU' AS country
         FROM [PolicyActivity] PA
         LEFT JOIN Policy P ON P.Id = PA.PolicyId
         LEFT JOIN [Master].[PolicyStatus] PS ON PS.Id = P.PolicyStatusId
